@@ -165,6 +165,7 @@ void MySolver::compute_F_grad_hess()
       E_h = 0;
       //E_h = (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q); //+=
       E_h = (
+        //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
         2*c12*sg_prime*sg +
         c22/r*pow(sg,2)
@@ -186,7 +187,7 @@ void MySolver::compute_F_grad_hess()
   } // end for cells
 
   // adiciona a parcela da derivada que nao esta no somatorio de pontos de quadratura (só do eta_n)
-  grad_F[n_dofs-1] += 2*pressure*radius;
+  grad_F[n_dofs-1] += 2*pressure*radius; //@@@@@@@
   hess_F[n_dofs-1][n_dofs-1] += 0;
     
 }
@@ -282,6 +283,7 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
 
       //E_h = (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q); //+=
       E_h += (
+        //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
         2*c12*sg_prime*sg +
         c22/r*pow(sg,2)
@@ -290,7 +292,7 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
     }
   } // end for cells
 
-  E_h = E_h + 2 * radius * pressure * new_s[n_dofs-1];
+  E_h = E_h + 2 * radius * pressure * new_s[n_dofs-1]; //@@@@@@
   F_delta = E_h;
     
   // derivada de F_delta com relacao a alpha
