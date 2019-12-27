@@ -48,12 +48,14 @@ private:
   void create_480_cells();
   void write_output_file();
   void compute_lagrange_det();
+  void contour_plot();
+  void init_u0();
 
   const unsigned int refine_global, quad_degree;
 
-  const double pressure = 500, c11 = 1e+5, c22 = 1e+3, c12 = 1e+3,
-               eps = 0.1, radius = 1;
-  double delta = 1e-0, delta_max = 1e+8;
+  const double pressure = 500.0, c11 = 1.0e+5, c22 = 1.0e+3, c12 = 1.0e+3,
+               eps = 0.1, radius = 1.0;
+  double delta = 1.0e-0, delta_max = 1.0e+8;
   unsigned int n_dofs;
   double alpha_k;
   bool verbose = false;
@@ -65,7 +67,7 @@ private:
   // dos seus vizinhos e ai o lagrange formava picos, com 1e-7 isso ja nao aconteceu mais.
   // De 1e-7 para 1e-10 nao houve uma grande diferenca
   // os resultados do lagrangeano (o calculo mais sensivel a erros) ficaram bem proximos
-  const double solution_tol = 1e-10; // criterio de parada da busca pelo s_k
+  const double solution_tol = 1.0e-10; // criterio de parada da busca pelo s_k
 
   std::ofstream output_file;
 
@@ -101,7 +103,7 @@ void MySolver::compute_F_grad_hess()
   //const bool analytic_diff = false;
 
   // reset gradiente e hessiana para zero
-  grad_F.assign(grad_F.size(), 0);
+  grad_F.assign(grad_F.size(), 0.0);
   hess_F.assign(grad_F.size(), grad_F);
   
 
@@ -109,9 +111,9 @@ void MySolver::compute_F_grad_hess()
   //std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
 
   // inicializacao de F_delta, E_h, ... , dofs
-  F_delta = 0;
-  E_h = 0;
-  P_h = 0;
+  F_delta = 0.0;
+  E_h = 0.0;
+  P_h = 0.0;
   /* for (unsigned int i = 0; i < n_dofs; ++i) // diz que dofs sao variaveis independentes
   {
     dofs[i] = solution[i];
@@ -142,12 +144,14 @@ void MySolver::compute_F_grad_hess()
       dofs[i] = solution[local_dof_indices[i]];
       dofs[i].diff(i, dofs_per_cell);
       dofs[i].val().diff(i, dofs_per_cell);
+      //std::cout << dofs[i] << std::endl;
+      //std::cout << solution[local_dof_indices[i]] << std::endl;
     }
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      sg = 0;
-      sg_prime = 0;
+      sg = 0.0;
+      sg_prime = 0.0;
       double r = fe_values.quadrature_point(q)[0]; // coordenada global do ponto de quadratura
     
       // Calculo (s.g) e (s.g')
@@ -167,9 +171,12 @@ void MySolver::compute_F_grad_hess()
       E_h = (
         //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
-        2*c12*sg_prime*sg +
+        2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2)
       ) * fe_values.JxW(q);
+
+      //std::cout << "E_h\n";
+      //std::cout << E_h << std::endl;
       
 
       //F_delta = c11/2 * E_h + P_h / delta;
@@ -187,13 +194,23 @@ void MySolver::compute_F_grad_hess()
   } // end for cells
 
   // adiciona a parcela da derivada que nao esta no somatorio de pontos de quadratura (só do eta_n)
-  grad_F[n_dofs-1] += 2*pressure*radius; //@@@@@@@
-  hess_F[n_dofs-1][n_dofs-1] += 0;
+  grad_F[n_dofs-1] += 2.0*pressure*radius; // 2.0*c12*solution[n_dofs-1]
+  hess_F[n_dofs-1][n_dofs-1] += 0; //2.0*c12;
     
 }
 
 void MySolver::compute_dk()
 {
+  /* std::cout << "DK:\n";
+  std::cout << "grad_F:\n";
+  for(unsigned int i=0; i < n_dofs; ++i)
+    std::cout << grad_F[i] << std::endl;
+  std::cout << "hess_F:\n";
+  for(unsigned int i=0; i < n_dofs; ++i)
+    for(unsigned int j=0; j < n_dofs; ++j)
+      std::cout << hess_F[i][j] << std::endl; */
+  
+
   // cria o Tensor que vai conter o gradiente e a hessiana
   //Vector<double> gradT(grad_F.begin(), grad_F.end()), dkT(grad_F.begin(), grad_F.end());
   //dkT.reinit(n_dofs);
@@ -239,7 +256,7 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
 {
   // alphaAD é uma variavel interna de compute_alpha_derivs que recebe o valor do alpha atual
   // e é usada para fazer as derivadas
-  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> new_s(n_dofs, 0); // new_s = s_k + alpha^(i) * d_k
+  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> new_s(n_dofs, 0.0); // new_s = s_k + alpha^(i) * d_k
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> alphaAD;
   alphaAD = alpha;
   alphaAD.diff(0,1); // so vamos derivar com relacao a alphaAD
@@ -247,7 +264,7 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
 
   // codigo duplicado (mas modificado) de compute_F_grad_hess:
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h;
-  F_delta = 0; E_h = 0; P_h = 0;
+  F_delta = 0.0; E_h = 0.0; P_h = 0.0;
   for (unsigned int i = 0; i < n_dofs; ++i)
     new_s[i] = solution[i] + alphaAD * dk[i];
 
@@ -269,8 +286,8 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      sg = 0;
-      sg_prime = 0;
+      sg = 0.0;
+      sg_prime = 0.0;
       double r = fe_values.quadrature_point(q)[0]; // coordenada global
     
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
@@ -285,14 +302,14 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
       E_h += (
         //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
-        2*c12*sg_prime*sg +
+        2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2)
       ) * fe_values.JxW(q);
       
     }
   } // end for cells
 
-  E_h = E_h + 2 * radius * pressure * new_s[n_dofs-1]; //@@@@@@
+  E_h = E_h + 2.0*radius*pressure*new_s[n_dofs-1]; //c12*pow(new_s[n_dofs-1],2)
   F_delta = E_h;
     
   // derivada de F_delta com relacao a alpha
@@ -335,8 +352,95 @@ void MySolver::compute_alpha()
   alpha_k = alpha;
 }
 
+void MySolver::contour_plot()
+{
+  std::vector<double> sol(n_dofs, 0.0);
+  double E_h;
+  E_h = 0.0;
+
+  // solucao para refine_global = 1 e u_0 = 0
+  sol[0] = 0;
+  sol[1] = -0.00949906;
+  sol[2] = -0.012724;
+
+  // solucao para refine_global = 2 e u_0 = 0
+  /* sol[0] = 0;
+  sol[1] = -0.00925251;
+  sol[2] = -0.0123937;
+  sol[3] = -0.0143035;
+  sol[4] = -0.0156813; */
+
+  // solucao para refine_global = 1 e u_0 = isotropico
+  /* sol[0] = 0.0;
+  sol[1] = -0.00951485;
+  sol[2] = -0.0119798; */
+
+  const QGauss<1>  quadrature_formula(quad_degree);
+  FEValues<1> fe_values (fe, quadrature_formula,
+                           update_values    |  update_gradients |
+                           update_quadrature_points  |  update_JxW_values);
+  
+  const unsigned int   dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int   n_q_points    = quadrature_formula.size();
+  std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+
+  double sg, sg_prime; // scalar_product(s,g) e (s,g')
+
+  for (const auto &cell : dof_handler.active_cell_iterators())
+  {
+    fe_values.reinit(cell);
+    cell->get_dof_indices(local_dof_indices);
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      sg = 0.0;
+      sg_prime = 0.0;
+      double r = fe_values.quadrature_point(q)[0]; // coordenada global
+    
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        const double phi_i = fe_values.shape_value(i, q);
+        const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
+        sg += sol[local_dof_indices[i]] * phi_i;
+        sg_prime += sol[local_dof_indices[i]] * phi_i_prime;
+      }
+
+      double v = (c11*r*pow(sg_prime,2) +
+        2.0*c12*sg_prime*sg +
+        c22/r*pow(sg,2) )* fe_values.JxW(q);
+      std::cout << "E_h += " << v << std::endl;
+
+      E_h += (
+        c11*r*pow(sg_prime,2) +
+        2.0*c12*sg_prime*sg +
+        c22/r*pow(sg,2)
+      ) * fe_values.JxW(q);
+    }
+  } // end for cells
+
+  E_h = E_h + 2.0 * radius * pressure * sol[n_dofs-1];
+  std::cout << "termo extra " << 2 * radius * pressure * sol[n_dofs-1] << std::endl; 
+  std::cout << "contour plot: " << E_h << std::endl;
+}
+
+void MySolver::init_u0()
+{
+  // solucao caso isotropico
+  //std::cout << "init_u0\n";
+  for(unsigned int i=0; i<n_dofs; ++i)
+  {
+    solution[i] = -pressure/(c11+c12)*(1.0/(n_dofs-1)*i);
+    //solution[i] = -500.0/(100000.+1000.)*(1./(3.-1.)*i);
+    //std::cout << solution[i] << std::endl;
+  }
+}
+
 void MySolver::solve()
 {
+  std::cout << "contour plot: ";
+  contour_plot(); // Checkpoiiiiiint
+  init_u0();
+  
   // so para "declarar" t1 e t2
   auto t1 = std::chrono::high_resolution_clock::now();
   auto t2 = std::chrono::high_resolution_clock::now();
