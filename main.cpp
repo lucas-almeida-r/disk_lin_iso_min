@@ -354,14 +354,14 @@ void MySolver::compute_alpha()
 
 void MySolver::contour_plot()
 {
-  std::vector<double> sol(n_dofs, 0.0);
+  //std::vector<double> sol(n_dofs, 0.0);
   double E_h;
   E_h = 0.0;
 
   // solucao para refine_global = 1 e u_0 = 0
-  sol[0] = 0;
-  sol[1] = -0.00949906;
-  sol[2] = -0.012724;
+  //sol[0] = 0;
+  //sol[1] = -0.00949906;
+  //sol[2] = -0.012724;
 
   // solucao para refine_global = 2 e u_0 = 0
   /* sol[0] = 0;
@@ -401,26 +401,30 @@ void MySolver::contour_plot()
       {
         const double phi_i = fe_values.shape_value(i, q);
         const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
-        sg += sol[local_dof_indices[i]] * phi_i;
-        sg_prime += sol[local_dof_indices[i]] * phi_i_prime;
+        sg += solution[local_dof_indices[i]] * phi_i;
+        sg_prime += solution[local_dof_indices[i]] * phi_i_prime;
       }
 
       double v = (c11*r*pow(sg_prime,2) +
-        2.0*c12*sg_prime*sg +
+        //2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2) )* fe_values.JxW(q);
       std::cout << "E_h += " << v << std::endl;
 
+      std::cout << v << "\n" << sg << "\n" << sg_prime << "\n" << fe_values.JxW(q)
+                << "\n" << c11 << "\n" << c22 << r << std::endl;
+
       E_h += (
         c11*r*pow(sg_prime,2) +
-        2.0*c12*sg_prime*sg +
+        //2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2)
       ) * fe_values.JxW(q);
     }
   } // end for cells
 
-  E_h = E_h + 2.0 * radius * pressure * sol[n_dofs-1];
-  std::cout << "termo extra " << 2 * radius * pressure * sol[n_dofs-1] << std::endl; 
-  std::cout << "contour plot: " << E_h << std::endl;
+  E_h = E_h + 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2);
+  std::cout << "termo extra " << 2 * radius * pressure * solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
+            << std::endl; 
+  std::cout << "E_h calculado: " << E_h << std::endl;
 }
 
 void MySolver::init_u0()
@@ -437,9 +441,9 @@ void MySolver::init_u0()
 
 void MySolver::solve()
 {
-  std::cout << "contour plot: ";
-  contour_plot(); // Checkpoiiiiiint
-  init_u0();
+  //std::cout << "contour plot: ";
+  //contour_plot(); // Checkpoiiiiiint
+  //init_u0();
   
   // so para "declarar" t1 e t2
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -598,7 +602,7 @@ void MySolver::run ()
     std::cout << "Cycle " << cycle << ':' << std::endl;
     if (cycle == 0)
       {
-        if(refine_global == 0) create_480_cells();
+        if(refine_global == 999) create_480_cells();
         else {
           GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
           triangulation.refine_global(refine_global);
@@ -633,6 +637,9 @@ void MySolver::run ()
 
     std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
               << std::endl << timing[2] << std::endl << timing[3] << std::endl;
+
+  std::cout << "contour plot: ";
+  contour_plot(); // Checkpoiiiiiint
     
   }
 }
@@ -647,7 +654,7 @@ int main()
       std::cout << "ref_global: ";
       std::cin >> ref;
       //int poly_degree, unsigned int refine_global, unsigned int quad_degree): 
-      MySolver solver(1,ref,3); // 0 para rodar com "480" elementos
+      MySolver solver(1,ref,1); // 0 para rodar com "480" elementos // antes usava 3 no 3o argumento
       solver.run();      
     }
   catch (std::exception &exc)
