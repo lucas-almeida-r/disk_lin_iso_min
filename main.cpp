@@ -171,7 +171,7 @@ void MySolver::compute_F_grad_hess()
       E_h = (
         //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
-        2.0*c12*sg_prime*sg +
+        //2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2)
       ) * fe_values.JxW(q);
 
@@ -194,8 +194,8 @@ void MySolver::compute_F_grad_hess()
   } // end for cells
 
   // adiciona a parcela da derivada que nao esta no somatorio de pontos de quadratura (só do eta_n)
-  grad_F[n_dofs-1] += 2.0*pressure*radius; // 2.0*c12*solution[n_dofs-1]
-  hess_F[n_dofs-1][n_dofs-1] += 0; //2.0*c12;
+  grad_F[n_dofs-1] += 2.0*pressure*radius + 2.0*c12*solution[n_dofs-1];
+  hess_F[n_dofs-1][n_dofs-1] += 2.0*c12;
     
 }
 
@@ -302,14 +302,14 @@ void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F
       E_h += (
         //(sg+1)*(sg+1) // teste: minimizar a funcao (u+1)**2 ok!
         c11*r*pow(sg_prime,2) +
-        2.0*c12*sg_prime*sg +
+        //2.0*c12*sg_prime*sg +
         c22/r*pow(sg,2)
       ) * fe_values.JxW(q);
       
     }
   } // end for cells
 
-  E_h = E_h + 2.0*radius*pressure*new_s[n_dofs-1]; //c12*pow(new_s[n_dofs-1],2)
+  E_h = E_h + 2.0*radius*pressure*new_s[n_dofs-1] + c12*pow(new_s[n_dofs-1],2);
   F_delta = E_h;
     
   // derivada de F_delta com relacao a alpha
@@ -411,7 +411,7 @@ void MySolver::contour_plot()
       std::cout << "E_h += " << v << std::endl;
 
       std::cout << v << "\n" << sg << "\n" << sg_prime << "\n" << fe_values.JxW(q)
-                << "\n" << c11 << "\n" << c22 << r << std::endl;
+                << "\n" << c11 << "\n" << c22 << std::endl << r << std::endl;
 
       E_h += (
         c11*r*pow(sg_prime,2) +
@@ -422,7 +422,7 @@ void MySolver::contour_plot()
   } // end for cells
 
   E_h = E_h + 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2);
-  std::cout << "termo extra " << 2 * radius * pressure * solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
+  std::cout << "termo extra " << 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
             << std::endl; 
   std::cout << "E_h calculado: " << E_h << std::endl;
 }
@@ -443,7 +443,7 @@ void MySolver::solve()
 {
   //std::cout << "contour plot: ";
   //contour_plot(); // Checkpoiiiiiint
-  //init_u0();
+  init_u0();
   
   // so para "declarar" t1 e t2
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -650,11 +650,13 @@ int main()
 {
   try
     {    
-      unsigned int ref;
+      unsigned int ref, quad;
       std::cout << "ref_global: ";
       std::cin >> ref;
+      std::cout << "quad: ";
+      std::cin >> quad;
       //int poly_degree, unsigned int refine_global, unsigned int quad_degree): 
-      MySolver solver(1,ref,1); // 0 para rodar com "480" elementos // antes usava 3 no 3o argumento
+      MySolver solver(1,ref,quad); // 0 para rodar com "480" elementos // antes usava 3 no 3o argumento
       solver.run();      
     }
   catch (std::exception &exc)
