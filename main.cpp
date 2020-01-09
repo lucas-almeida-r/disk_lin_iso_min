@@ -22,7 +22,7 @@
 #include <deal.II/fe/fe_q.h>
 
 //#include <deal.II/lac/lapack_full_matrix.h>
-//#include <deal.II/lac/sparse_direct.h> // direct solver
+#include <deal.II/lac/sparse_direct.h> // direct solver
 
 #include <iomanip> // @@@
 #include <limits> //@@@
@@ -246,19 +246,19 @@ void MySolver::compute_dk()
       //hessT[i][j] = hess_F[i][j]; 
   } */
   //==========================================
-  //SolverControl solver_control(1000, 1e-12);
-  //SolverCG<> solver(solver_control); //<> vazio indica que é o padrao: Vector<double>
-  //PreconditionSSOR<> preconditioner; //<> vazio indica que é o padrao: SparseMatrix<double>
-  //preconditioner.initialize(hessT, 1.2);
-  //solver.solve(hessT, dkT, gradT, PreconditionIdentity());
-  SolverControl solver_control(10000, 1e-12);
-  SolverCG<>    solver_cg(solver_control);
-
-  PreconditionSSOR<> preconditioner;
-  preconditioner.initialize(hess_F, 1.2);
-
-  solver_cg.solve(hess_F, dkT, gradT, preconditioner);
+  //SolverControl solver_control(10000, 1e-12);
+  //SolverCG<>    solver_cg(solver_control);
+  //PreconditionSSOR<> preconditioner;
+  //preconditioner.initialize(hess_F, 1.2);
+  //solver_cg.solve(hess_F, dkT, gradT, preconditioner);
   //==========================================
+
+  // sparse solver direto
+  // conforme step-29 faz
+  SparseDirectUMFPACK A_direct;
+  A_direct.initialize(hess_F); // calcula a inversa
+  A_direct.vmult(dkT, gradT);
+  //================================================
   
   // .solve espera que ja tenhamos feito a LU factorization
   // inicialmente dkT é o vetor do lado direito, mas apos o .solve ele vira a solucao do sistema
@@ -645,8 +645,8 @@ void MySolver::run ()
     solve();
     //compute_lagrange_det();
     //write_output_file();
-    for (unsigned int i = 0; i<n_dofs; ++i)
-      std::cout << solution[i] << std::endl;
+    //for (unsigned int i = 0; i<n_dofs; ++i)
+    //  std::cout << solution[i] << std::endl;
 
     std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
               << std::endl << timing[2] << std::endl << timing[3] << std::endl;
