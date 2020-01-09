@@ -405,13 +405,13 @@ void MySolver::contour_plot()
         sg_prime += solution[local_dof_indices[i]] * phi_i_prime;
       }
 
-      double v = (c11*r*pow(sg_prime,2) +
-        //2.0*c12*sg_prime*sg +
-        c22/r*pow(sg,2) )* fe_values.JxW(q);
-      std::cout << "E_h += " << v << std::endl;
+      //double v = (c11*r*pow(sg_prime,2) +
+      //  //2.0*c12*sg_prime*sg +
+      //  c22/r*pow(sg,2) )* fe_values.JxW(q);
+      //std::cout << "E_h += " << v << std::endl;
 
-      std::cout << v << "\n" << sg << "\n" << sg_prime << "\n" << fe_values.JxW(q)
-                << "\n" << c11 << "\n" << c22 << std::endl << r << std::endl;
+      //std::cout << v << "\n" << sg << "\n" << sg_prime << "\n" << fe_values.JxW(q)
+      //          << "\n" << c11 << "\n" << c22 << std::endl << r << std::endl;
 
       E_h += (
         c11*r*pow(sg_prime,2) +
@@ -422,9 +422,12 @@ void MySolver::contour_plot()
   } // end for cells
 
   E_h = E_h + 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2);
-  std::cout << "termo extra " << 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
-            << std::endl; 
+  //std::cout << "termo extra " << 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
+  //          << std::endl; 
   std::cout << "E_h calculado: " << E_h << std::endl;
+
+  std::vector<double> E_h_vec(1, E_h);
+  output_data.emplace_back(E_h_vec);
 }
 
 void MySolver::init_u0()
@@ -531,7 +534,7 @@ void MySolver::write_output_file()
       rhos[i_rhos] = cell->vertex(1)(0);
       i_rhos += 1;
     }
-    rhos.insert(rhos.begin(), 0); // para alinhar com os deslocs
+    //rhos.insert(rhos.begin(), 0); // para alinhar com os deslocs
     output_data.insert(output_data.begin(), rhos);
 
   for (unsigned int i = 0; i < size(output_data); ++i)
@@ -640,6 +643,7 @@ void MySolver::run ()
 
   std::cout << "contour plot: ";
   contour_plot(); // Checkpoiiiiiint
+  write_output_file();
     
   }
 }
