@@ -74,6 +74,9 @@ private:
   // os resultados do lagrangeano (o calculo mais sensivel a erros) ficaram bem proximos
   const double solution_tol = 1.0e-10; // criterio de parada da busca pelo s_k
 
+  int excel_skip;
+  const bool excel_output = true; // "true" caso quiser limitar o output a 1024 elementos
+
   std::ofstream output_file;
 
   Triangulation<1> triangulation;
@@ -488,7 +491,7 @@ void MySolver::solve()
       solution_sum += std::abs(solution[i]);
       prev_solution_sum += std::abs(prev_solution[i]);
     }
-    solution_crit = (solution_sum - prev_solution_sum) / (solution_sum + 1e-10);
+    solution_crit = (solution_sum - prev_solution_sum);// / (solution_sum + 1e-10);
     if (solution_crit < solution_tol) break; // sai do loop do s_k
 
     // ja iterou muitas vezes
@@ -544,7 +547,7 @@ void MySolver::write_output_file()
 
   for (unsigned int i = 0; i < size(output_data); ++i)
   {
-    for (unsigned int j = 0; j < size(output_data[i]); ++j)
+    for (unsigned int j = 0; j < size(output_data[i]); j+=excel_skip)
     {
       if(j == size(output_data[i])-1) {
         output_file << output_data[i][j] << std::endl;
@@ -610,10 +613,12 @@ void MySolver::run ()
     std::cout << "Cycle " << cycle << ':' << std::endl;
     if (cycle == 0)
       {
+        excel_skip = 1;
         if(refine_global == 999) create_480_cells();
         else {
           GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
           triangulation.refine_global(refine_global);
+          if (refine_global > 10 && excel_output) excel_skip = pow(2,refine_global) / 1024; 
         }
       }
     else
