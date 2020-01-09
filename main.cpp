@@ -3,6 +3,10 @@
 #include <deal.II/base/tensor.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
+#include <deal.II/lac/sparse_matrix.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_refinement.h>
@@ -17,7 +21,8 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <deal.II/lac/lapack_full_matrix.h>
+//#include <deal.II/lac/lapack_full_matrix.h>
+//#include <deal.II/lac/sparse_direct.h> // direct solver
 
 #include <iomanip> // @@@
 #include <limits> //@@@
@@ -79,7 +84,9 @@ private:
   //std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> solution;
   std::vector<double> solution, prev_solution;
   std::vector<double> grad_F, dk;
-  std::vector<std::vector<double>> hess_F;
+  //std::vector<std::vector<double>> hess_F;
+  SparseMatrix<double> hess_F;
+  SparsityPattern      sparsity_pattern;
 
   // comp_grad, comp_dk, comp_alpha, update + criterio de parada
   std::vector<double> timing{0.,0.,0.,0.};
@@ -104,7 +111,8 @@ void MySolver::compute_F_grad_hess()
 
   // reset gradiente e hessiana para zero
   grad_F.assign(grad_F.size(), 0.0);
-  hess_F.assign(grad_F.size(), grad_F);
+  //hess_F.assign(grad_F.size(), grad_F);
+  hess_F = 0;
   
 
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h;
@@ -187,7 +195,10 @@ void MySolver::compute_F_grad_hess()
       {
         grad_F[local_dof_indices[i]] += F_delta.dx(i).val();
         for(unsigned int j = 0; j < dofs_per_cell; ++j)
-          hess_F[local_dof_indices[i]][local_dof_indices[j]] += F_delta.dx(i).dx(j);
+          hess_F.add (local_dof_indices[i],
+                      local_dof_indices[j],
+                      F_delta.dx(i).dx(j));
+          //hess_F[local_dof_indices[i]][local_dof_indices[j]] += F_delta.dx(i).dx(j);
       }
         
     }
@@ -195,7 +206,10 @@ void MySolver::compute_F_grad_hess()
 
   // adiciona a parcela da derivada que nao esta no somatorio de pontos de quadratura (só do eta_n)
   grad_F[n_dofs-1] += 2.0*pressure*radius + 2.0*c12*solution[n_dofs-1];
-  hess_F[n_dofs-1][n_dofs-1] += 2.0*c12;
+  //hess_F[n_dofs-1][n_dofs-1] += 2.0*c12;
+  hess_F.add (n_dofs-1,
+              n_dofs-1,
+              2.0*c12);
     
 }
 
@@ -219,29 +233,37 @@ void MySolver::compute_dk()
   // Resolvendo o sistema com solver lapack
   // Na verdade o ideal seria trabalhar com a hessiana como uma SparseMatrix e usar
   // algum solver de matriz esparsa da dealii
-  Vector<double> dkT(grad_F.begin(), grad_F.end());
-  LAPACKFullMatrix<double> lapack_hess(n_dofs);
+  Vector<double> dkT;
+  dkT.reinit(grad_F.size());
+  Vector<double> gradT(grad_F.begin(), grad_F.end());
+  //LAPACKFullMatrix<double> lapack_hess(n_dofs);
   
-  for (unsigned int i = 0; i < n_dofs; ++i)
+  /* for (unsigned int i = 0; i < n_dofs; ++i)
   {
     //gradT(i) = grad_F[i];
     for (unsigned int j = 0; j < n_dofs; ++j)
       lapack_hess(i,j) = hess_F[i][j];
-      //hessT[i][j] = hess_F[i][j];
-      
-  }
+      //hessT[i][j] = hess_F[i][j]; 
+  } */
   //==========================================
   //SolverControl solver_control(1000, 1e-12);
   //SolverCG<> solver(solver_control); //<> vazio indica que é o padrao: Vector<double>
   //PreconditionSSOR<> preconditioner; //<> vazio indica que é o padrao: SparseMatrix<double>
   //preconditioner.initialize(hessT, 1.2);
   //solver.solve(hessT, dkT, gradT, PreconditionIdentity());
+  SolverControl solver_control(10000, 1e-12);
+  SolverCG<>    solver_cg(solver_control);
+
+  PreconditionSSOR<> preconditioner;
+  preconditioner.initialize(hess_F, 1.2);
+
+  solver_cg.solve(hess_F, dkT, gradT, preconditioner);
   //==========================================
   
   // .solve espera que ja tenhamos feito a LU factorization
   // inicialmente dkT é o vetor do lado direito, mas apos o .solve ele vira a solucao do sistema
-  lapack_hess.compute_lu_factorization();
-  lapack_hess.solve(dkT);
+  //lapack_hess.compute_lu_factorization();
+  //lapack_hess.solve(dkT);
 
   //inv_hessT.invert(hessT);
   //inv_hessT.vmult(dkT, gradT);
@@ -357,23 +379,6 @@ void MySolver::contour_plot()
   //std::vector<double> sol(n_dofs, 0.0);
   double E_h;
   E_h = 0.0;
-
-  // solucao para refine_global = 1 e u_0 = 0
-  //sol[0] = 0;
-  //sol[1] = -0.00949906;
-  //sol[2] = -0.012724;
-
-  // solucao para refine_global = 2 e u_0 = 0
-  /* sol[0] = 0;
-  sol[1] = -0.00925251;
-  sol[2] = -0.0123937;
-  sol[3] = -0.0143035;
-  sol[4] = -0.0156813; */
-
-  // solucao para refine_global = 1 e u_0 = isotropico
-  /* sol[0] = 0.0;
-  sol[1] = -0.00951485;
-  sol[2] = -0.0119798; */
 
   const QGauss<1>  quadrature_formula(quad_degree);
   FEValues<1> fe_values (fe, quadrature_formula,
@@ -625,8 +630,13 @@ void MySolver::run ()
     prev_solution.resize(n_dofs, 0);
     grad_F.resize(n_dofs, 0);
     dk.resize(n_dofs, 0);
-    hess_F.resize(n_dofs, grad_F);
+    //hess_F.resize(n_dofs, grad_F);
     alpha_k = 0;
+
+    DynamicSparsityPattern dsp(dof_handler.n_dofs());
+    DoFTools::make_sparsity_pattern (dof_handler, dsp);
+    sparsity_pattern.copy_from(dsp);
+    hess_F.reinit (sparsity_pattern);
       
     std::cout << "   Number of degrees of freedom: "
               << dof_handler.n_dofs()
