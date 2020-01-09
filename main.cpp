@@ -55,6 +55,7 @@ private:
   void compute_lagrange_det();
   void contour_plot();
   void init_u0();
+  void compute_exact_solution();
 
   const unsigned int refine_global, quad_degree;
 
@@ -76,6 +77,7 @@ private:
 
   int excel_skip;
   const bool excel_output = true; // "true" caso quiser limitar o output a 1024 elementos
+  std::vector<double> exact_solution;
 
   std::ofstream output_file;
 
@@ -432,7 +434,8 @@ void MySolver::contour_plot()
   E_h = E_h + 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2);
   //std::cout << "termo extra " << 2.0*radius*pressure*solution[n_dofs-1] + c12*pow(solution[n_dofs-1],2) 
   //          << std::endl; 
-  std::cout << "E_h calculado: " << E_h << std::endl;
+
+  std::cout << "E_h calculado: " << std::fixed << std::setprecision(12) << E_h << std::endl;
 
   std::vector<double> E_h_vec(1, E_h);
   output_data.emplace_back(E_h_vec);
@@ -447,6 +450,21 @@ void MySolver::init_u0()
     solution[i] = -pressure/(c11+c12)*(1.0/(n_dofs-1)*i);
     //solution[i] = -500.0/(100000.+1000.)*(1./(3.-1.)*i);
     //std::cout << solution[i] << std::endl;
+  }
+}
+
+void MySolver::compute_exact_solution()
+{
+  const unsigned int   dofs_per_cell = fe.dofs_per_cell;
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+  double k = pow(c22/c11, 0.5);
+
+  for (const auto &cell : dof_handler.active_cell_iterators())
+  {
+    cell->get_dof_indices(local_dof_indices);
+    double r = cell->vertex(1)(0);
+    solution[local_dof_indices[1]] = -pressure / (pow(c11*c22, 0.5)+c12) / pow(radius,k-1) * pow(r, k);
+    //std::cout << solution[local_dof_indices[1]] << std::endl;
   }
 }
 
@@ -614,7 +632,7 @@ void MySolver::run ()
     if (cycle == 0)
       {
         excel_skip = 1;
-        if(refine_global == 999) create_480_cells();
+        if(refine_global == 480) create_480_cells();
         else {
           GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
           triangulation.refine_global(refine_global);
@@ -656,8 +674,11 @@ void MySolver::run ()
     std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
               << std::endl << timing[2] << std::endl << timing[3] << std::endl;
 
-  std::cout << "contour plot: ";
-  contour_plot(); // Checkpoiiiiiint
+  std::cout << "solucao numerica: ";
+  contour_plot();
+  //compute_exact_solution();
+  //std::cout << "solucao exata: ";
+  //contour_plot(); // calcula o E_h com a solucao exata da teoria linear classica
   write_output_file();
     
   }
