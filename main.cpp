@@ -529,7 +529,7 @@ void MySolver::create_480_cells()
 
 void MySolver::write_output_file()
 {
-  output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
+  output_file.open("out/sol ref" + std::to_string(refine_global) + " " + std::to_string(quad_degree) + ".txt");
   
   // add os rho de cada dof na primeira linha de output_data
   std::vector<double> rhos(n_dofs, 0.);
